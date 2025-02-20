@@ -173,7 +173,7 @@ fn extract_zip(zip_data: &[u8], output_dir: &Path) -> io::Result<()> {{
         
         extracted += 1;
         if extracted % 100 == 0 || extracted == total_files {{
-            println!("Extracted {{}}{{}} files...", extracted, total_files);
+            println!("Extracted {{}}/{{}} files...", extracted, total_files);
         }}
     }}
     Ok(())
