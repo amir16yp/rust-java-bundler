@@ -102,7 +102,7 @@ fn get_data_dir(use_user_install: bool) -> io::Result<std::path::PathBuf> {{
 fn main() -> io::Result<()> {{
     // Parse command line arguments
     let args: Vec<String> = env::args().collect();
-    let use_user_install = args.contains(&"--user-install".to_string());
+    let use_user_install = {str(use_localappdata).lower()};
     
     // Get the appropriate data directory
     let data_dir = get_data_dir(use_user_install)?;
@@ -111,7 +111,6 @@ fn main() -> io::Result<()> {{
     // Filter out our custom argument before passing to Java
     let java_args: Vec<String> = args.into_iter()
         .skip(1)  // Skip executable name
-        .filter(|arg| arg != "--user-install")
         .collect();
     
     if !jre_dir.exists() {{
