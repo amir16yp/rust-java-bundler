@@ -8,13 +8,34 @@ from typing import List, Tuple
 
 def find_java_path(jre_zip_path: str) -> tuple[str, str]:
     with zipfile.ZipFile(jre_zip_path) as zf:
-        for path in zf.namelist():
-            normalized = path.replace('\\', '/')
-            if normalized.endswith('/bin/java') or normalized.endswith('/bin/java.exe'):
+        # Get all files in the zip for debugging
+        all_files = zf.namelist()
+        # Try to find java executable with various possible paths
+        for path in all_files:
+            normalized = path.replace('\\', '/').lower()  # Case-insensitive comparison
+            
+            # Common patterns for java executable location
+            if (normalized.endswith('/bin/java') or 
+                normalized.endswith('/bin/java.exe') or
+                normalized.endswith('java.exe') or  # Direct in root
+                normalized.endswith('java')):       # Direct in root
+                
                 parts = normalized.split('/')
-                root_dir = parts[0]
-                bin_index = parts.index('bin')
-                return root_dir, '/'.join(parts[bin_index:])
+                
+                # Try to find 'bin' directory
+                try:
+                    bin_index = parts.index('bin')
+                    # If 'bin' found, use it as the split point
+                    if bin_index == 0:
+                        return '', '/'.join(parts)
+                    root_dir = parts[0]
+                    return root_dir, '/'.join(parts[bin_index:])
+                except ValueError:
+                    # If no 'bin' directory, treat the java executable as directly in root
+                    return '', path
+                    
+    print("\nWARNING: Could not find java executable in JRE zip.")
+    print("Please check that the zip file contains a Java executable (java or java.exe)")
     raise ValueError("Could not find java executable in JRE zip")
 
 def create_cargo_toml(project_dir: Path, project_name: str) -> None:
@@ -61,12 +82,15 @@ fn main() -> io::Result<()> {{
     let jre_dir = data_dir.join("jre");
     
     if !jre_dir.exists() {{
+        println!("Extracting JRE...");
         create_dir_all(&jre_dir)?;
         extract_zip(JRE_ZIP, &jre_dir)?;
+        println!("JRE extraction complete");
     }}
 
     let jar_path = data_dir.join("app.jar");
     if !jar_path.exists() {{
+        println!("Extracting application...");
         create_dir_all(&data_dir)?;
         write_file(&jar_path, JAR_FILE)?;
     }}
@@ -101,19 +125,26 @@ fn main() -> io::Result<()> {{
 
 fn extract_zip(zip_data: &[u8], output_dir: &Path) -> io::Result<()> {{
     let mut archive = zip::ZipArchive::new(io::Cursor::new(zip_data))?;
+    let total_files = archive.len();
+    let mut extracted = 0;
     
     for i in 0..archive.len() {{
         let mut file = archive.by_index(i)?;
         let name = file.name().replace('\\\\', "/");
         
-        // Skip the root directory itself
-        if name == "{root_dir}/" {{
-            continue;
-        }}
-        
-        // Strip root directory from path
-        let relative_path = name.strip_prefix("{root_dir}/")
-            .unwrap_or(&name);
+        let relative_path = if "{root_dir}".is_empty() {{
+            // If no root dir, use the full path
+            &name
+        }} else {{
+            // Skip the root directory itself
+            if name == "{root_dir}/" {{
+                continue;
+            }}
+            
+            // Strip root directory from path
+            name.strip_prefix("{root_dir}/")
+                .unwrap_or(&name)
+        }};
 
         let out_path = output_dir.join(relative_path);
 
@@ -139,6 +170,11 @@ fn extract_zip(zip_data: &[u8], output_dir: &Path) -> io::Result<()> {{
                 std::fs::set_permissions(&out_path, perms)?;
             }}
         }}
+        
+        extracted += 1;
+        if extracted % 100 == 0 || extracted == total_files {{
+            println!("Extracted {{}}{{}} files...", extracted, total_files);
+        }}
     }}
     Ok(())
 }}
@@ -157,11 +193,13 @@ fn bundle_additional_files(base_dir: &Path, files: &[(&str, &[u8])]) -> io::Resu
     for (filename, data) in files {{
         let file_path = base_dir.join(filename);
         if !file_path.exists() {{
+            println!("Extracting {{}}", filename);
             write_file(&file_path, data)?;
         }}
     }}
     Ok(())
-}}'''
+}}
+'''
 
     src_dir = project_dir / "src"
     src_dir.mkdir(exist_ok=True)
