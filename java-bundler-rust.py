@@ -58,7 +58,7 @@ edition = "2021"
 
 [dependencies]
 zip = "0.6"
-{'''dirs = "5.0"''' if use_localappdata else ''}
+dirs = "5.0"
 '''
     with open(project_dir / "Cargo.toml", "w") as f:
         f.write(cargo_content)
@@ -270,9 +270,6 @@ def create_rust_project(
     print("  cargo build --release")
     print("\nAfter building, you can run the application with arguments:")
     print(f"  ./target/release/{project_name} [args...]")
-    print("\nTo install in user's local app data directory:")
-    print(f"  ./target/release/{project_name} --user-install [args...]")
-
 def main():
     parser = argparse.ArgumentParser(
         description="Generate a Rust project for bundling Java applications",
